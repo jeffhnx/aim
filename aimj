@@ -1,85 +1,59 @@
 -- Variables
 local aimbotEnabled = false -- Controls the toggle state of the aimbot
-local targetHead = nil -- Holds the reference to the player's head we are tracking
-local highlightObject = nil -- Reference to the highlight object
+local highlightObjects = {} -- Table to hold all highlight objects
 
 -- Keybind for toggling the aimbot
 local toggleKey = Enum.UserInputType.MouseButton2 -- Right-click
 
--- Function to create or update the highlight object
-local function highlightPlayer(player)
-    -- If highlight object exists, destroy it
-    if highlightObject then
-        highlightObject:Destroy()
-    end
-    
-    -- Create a new Highlight object
-    highlightObject = Instance.new("Highlight")
-    highlightObject.Adornee = player.Character -- Attach it to the player's character
-    highlightObject.FillColor = Color3.new(1, 0, 0) -- Red color
-    highlightObject.FillTransparency = 0.5 -- Slight transparency
-    highlightObject.OutlineTransparency = 1 -- Hide the outline
-    highlightObject.Parent = player.Character -- Parent it to the player's character
-end
-
--- Function to find the closest player's head
-local function getClosestPlayerHead()
-    local players = game.Players:GetPlayers()
-    local localPlayer = game.Players.LocalPlayer
-    local camera = game.Workspace.CurrentCamera
-    local closestDistance = math.huge
-    local closestHead = nil
-    local closestPlayer = nil
-
-    for _, player in pairs(players) do
-        if player ~= localPlayer and player.Character and player.Character:FindFirstChild("Head") then
-            local headPosition = player.Character.Head.Position
-            local screenPosition, onScreen = camera:WorldToScreenPoint(headPosition)
-            local mousePosition = game.Players.LocalPlayer:GetMouse().Hit.Position
-            local distance = (mousePosition - headPosition).magnitude
-
-            if distance < closestDistance and onScreen then
-                closestDistance = distance
-                closestHead = player.Character.Head
-                closestPlayer = player -- Keep track of the player
-            end
+-- Function to highlight all players
+local function highlightAllPlayers()
+    -- Remove any existing highlights
+    for _, highlight in pairs(highlightObjects) do
+        if highlight then
+            highlight:Destroy()
         end
     end
+    -- Clear the table
+    highlightObjects = {}
 
-    -- Highlight the closest player
-    if closestPlayer then
-        highlightPlayer(closestPlayer)
+    -- Loop through all players
+    local players = game.Players:GetPlayers()
+    local localPlayer = game.Players.LocalPlayer
+
+    for _, player in pairs(players) do
+        if player ~= localPlayer and player.Character then
+            -- Create a new Highlight object for each player
+            local highlight = Instance.new("Highlight")
+            highlight.Adornee = player.Character -- Attach to the player's character
+            highlight.FillColor = Color3.new(1, 0, 0) -- Red color
+            highlight.FillTransparency = 0.5 -- Slight transparency
+            highlight.OutlineTransparency = 1 -- Hide the outline
+            highlight.Parent = player.Character -- Parent it to the player's character
+
+            -- Add the highlight to the table to track it
+            table.insert(highlightObjects, highlight)
+        end
     end
-
-    return closestHead
 end
 
--- Function to enable aimbot and track the player's head
-local function aimAtTarget()
-    local camera = game.Workspace.CurrentCamera
-    if targetHead then
-        camera.CFrame = CFrame.new(camera.CFrame.Position, targetHead.Position)
+-- Function to remove all highlights
+local function removeAllHighlights()
+    for _, highlight in pairs(highlightObjects) do
+        if highlight then
+            highlight:Destroy() -- Destroy the highlight object
+        end
     end
+    highlightObjects = {} -- Clear the table
 end
 
--- Toggle aimbot on right-click
+-- Toggle aimbot (and highlights) on right-click
 game:GetService("UserInputService").InputBegan:Connect(function(input)
     if input.UserInputType == toggleKey then
         aimbotEnabled = not aimbotEnabled -- Toggle the aimbot
         if aimbotEnabled then
-            targetHead = getClosestPlayerHead() -- Set the target to the closest player's head
+            highlightAllPlayers() -- Highlight all players
         else
-            targetHead = nil -- Stop tracking when disabled
-            if highlightObject then
-                highlightObject:Destroy() -- Remove highlight when aimbot is disabled
-            end
+            removeAllHighlights() -- Remove all highlights when disabled
         end
-    end
-end)
-
--- Update the camera to track the target's head if the aimbot is enabled
-game:GetService("RunService").RenderStepped:Connect(function()
-    if aimbotEnabled and targetHead then
-        aimAtTarget() -- Call the function to aim at the target
     end
 end)
