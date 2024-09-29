@@ -1,0 +1,58 @@
+-- Variables
+local aimbotEnabled = false -- This controls the toggle state of the aimbot
+local targetHead = nil -- This will hold the reference to the player's head we are tracking
+
+-- Keybind for toggling the aimbot
+local toggleKey = Enum.UserInputType.MouseButton2 -- Right-click
+
+-- Function to find the closest player's head
+local function getClosestPlayerHead()
+    local players = game.Players:GetPlayers()
+    local localPlayer = game.Players.LocalPlayer
+    local camera = game.Workspace.CurrentCamera
+    local closestDistance = math.huge
+    local closestHead = nil
+
+    for _, player in pairs(players) do
+        if player ~= localPlayer and player.Character and player.Character:FindFirstChild("Head") then
+            local headPosition = player.Character.Head.Position
+            local screenPosition, onScreen = camera:WorldToScreenPoint(headPosition)
+            local mousePosition = game.Players.LocalPlayer:GetMouse().Hit.Position
+            local distance = (mousePosition - headPosition).magnitude
+
+            if distance < closestDistance and onScreen then
+                closestDistance = distance
+                closestHead = player.Character.Head
+            end
+        end
+    end
+
+    return closestHead
+end
+
+-- Function to enable aimbot and track the player's head
+local function aimAtTarget()
+    local camera = game.Workspace.CurrentCamera
+    if targetHead then
+        camera.CFrame = CFrame.new(camera.CFrame.Position, targetHead.Position)
+    end
+end
+
+-- Toggle aimbot on right-click
+game:GetService("UserInputService").InputBegan:Connect(function(input)
+    if input.UserInputType == toggleKey then
+        aimbotEnabled = not aimbotEnabled -- Toggle the aimbot
+        if aimbotEnabled then
+            targetHead = getClosestPlayerHead() -- Set the target to the closest player's head
+        else
+            targetHead = nil -- Stop tracking when disabled
+        end
+    end
+end)
+
+-- Update the camera to track the target's head if the aimbot is enabled
+game:GetService("RunService").RenderStepped:Connect(function()
+    if aimbotEnabled and targetHead then
+        aimAtTarget() -- Call the function to aim at the target
+    end
+end)
