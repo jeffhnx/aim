@@ -1,1 +1,113 @@
+-- Variables
+local aimbotEnabled = false -- Controls whether the aimbot is active (hold right-click)
+local espEnabled = false -- Controls the toggle state of ESP (press "P")
+local targetHead = nil -- Reference to the player's head being tracked
+local highlightObjects = {} -- Table to hold all ESP highlight objects
 
+-- Keybinds
+local aimbotKey = Enum.UserInputType.MouseButton2 -- Right-click (hold)
+local espToggleKey = Enum.KeyCode.P -- Key "P" for toggling ESP
+
+-- Function to create or update the highlight object (ESP)
+local function highlightPlayer(player)
+    -- Create a new Highlight object for ESP
+    local highlight = Instance.new("Highlight")
+    highlight.Adornee = player.Character -- Attach to the player's character
+    highlight.FillColor = Color3.new(1, 0, 0) -- Red color
+    highlight.FillTransparency = 0.7 -- Transparency for ESP
+    highlight.OutlineTransparency = 0 -- Make outline visible
+    highlight.OutlineColor = Color3.new(1, 1, 1) -- White outline
+    highlight.Parent = player.Character -- Parent it to the player's character
+
+    -- Add the highlight to the table to track it
+    highlightObjects[player.Name] = highlight
+end
+
+-- Function to add ESP to all players
+local function enableESP()
+    local players = game.Players:GetPlayers()
+    local localPlayer = game.Players.LocalPlayer
+
+    for _, player in pairs(players) do
+        if player ~= localPlayer and player.Character then
+            highlightPlayer(player) -- Highlight each player
+        end
+    end
+end
+
+-- Function to remove ESP from all players
+local function disableESP()
+    for _, highlight in pairs(highlightObjects) do
+        if highlight then
+            highlight:Destroy() -- Remove the highlight object
+        end
+    end
+    highlightObjects = {} -- Clear the table
+end
+
+-- Function to toggle ESP on/off with "P"
+game:GetService("UserInputService").InputBegan:Connect(function(input)
+    if input.KeyCode == espToggleKey then
+        espEnabled = not espEnabled -- Toggle ESP
+        if espEnabled then
+            enableESP() -- Enable ESP
+        else
+            disableESP() -- Disable ESP
+        end
+    end
+end)
+
+-- Function to find the closest player's head
+local function getClosestPlayerHead()
+    local players = game.Players:GetPlayers()
+    local localPlayer = game.Players.LocalPlayer
+    local camera = game.Workspace.CurrentCamera
+    local closestDistance = math.huge
+    local closestHead = nil
+
+    for _, player in pairs(players) do
+        if player ~= localPlayer and player.Character and player.Character:FindFirstChild("Head") then
+            local headPosition = player.Character.Head.Position
+            local screenPosition, onScreen = camera:WorldToScreenPoint(headPosition)
+            local mousePosition = game.Players.LocalPlayer:GetMouse().Hit.Position
+            local distance = (mousePosition - headPosition).magnitude
+
+            if distance < closestDistance and onScreen then
+                closestDistance = distance
+                closestHead = player.Character.Head
+            end
+        end
+    end
+
+    return closestHead
+end
+
+-- Function to aim at the target player's head
+local function aimAtTarget()
+    local camera = game.Workspace.CurrentCamera
+    if targetHead then
+        camera.CFrame = CFrame.new(camera.CFrame.Position, targetHead.Position)
+    end
+end
+
+-- Detect holding right-click for aimbot
+game:GetService("UserInputService").InputBegan:Connect(function(input)
+    if input.UserInputType == aimbotKey then
+        aimbotEnabled = true -- Enable aimbot (tracking)
+        targetHead = getClosestPlayerHead() -- Set the target to the closest player's head
+    end
+end)
+
+game:GetService("UserInputService").InputEnded:Connect(function(input)
+    if input.UserInputType == aimbotKey then
+        aimbotEnabled = false -- Disable aimbot (tracking stops)
+        targetHead = nil -- Stop tracking when right-click is released
+    end
+end)
+
+-- Update the camera to track the target's head if the aimbot is enabled
+game:GetService("RunService").RenderStepped:Connect(function()
+    if aimbotEnabled and targetHead then
+        aimAtTarget() -- Call the function to aim at the target
+    end
+end)
